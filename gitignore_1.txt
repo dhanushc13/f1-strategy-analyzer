@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+f1_env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# FastF1 Cache (large — don't commit)
+data/f1_cache/
+f1_cache/
+
+# Outputs (optional — commit only final ones)
+outputs/*.png
+outputs/*.html
+!outputs/f1_full_analyzer.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
