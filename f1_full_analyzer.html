@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Strategy Analyzer</title>
+<style>
+:root {
+  --red:#E8002D;--red2:#ff1744;--red-glow:rgba(232,0,45,0.25);
+  --red-dim:rgba(232,0,45,0.10);--red-border:rgba(232,0,45,0.20);
+  --bg:#06000A;--bg2:#0D0012;--surf:#110016;--surf2:#1a001f;
+  --text:#FFF0F3;--muted:rgba(255,220,230,0.5);--faint:rgba(255,200,215,0.12);
+  --gold:#FFD700;--cyan:#00D2FF;--violet:#B347FF;--green:#22DD88;
+  --ease:cubic-bezier(0.25,0.46,0.45,0.94);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden;cursor:none;}
+#cursor{position:fixed;width:10px;height:10px;background:var(--red);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);box-shadow:0 0 12px var(--red);}
+#cursor-ring{position:fixed;width:34px;height:34px;border:1.5px solid rgba(232,0,45,0.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .2s,height .2s,border-color .2s;}
+#particles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.pt{position:absolute;width:2px;height:2px;border-radius:50%;background:var(--red);opacity:0;animation:ptF linear infinite;}
+@keyframes ptF{0%{opacity:0;transform:translateY(100vh);}10%{opacity:.4;}90%{opacity:.15;}100%{opacity:0;transform:translateY(-20px) translateX(20px);}}
+
+/* ── NAV ── */
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 28px;background:rgba(6,0,10,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--red-border);}
+.nav-logo{display:flex;align-items:center;gap:10px;}
+.f1-badge{background:var(--red);color:#fff;padding:3px 9px;font-size:12px;font-weight:900;letter-spacing:3px;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);}
+.nav-title{font-size:13px;font-weight:700;letter-spacing:2px;}
+.race-info{display:flex;gap:20px;font-size:10px;color:var(--muted);letter-spacing:1px;}
+.race-info strong{color:var(--text);}
+
+/* ── FEATURE TABS ── */
+.tabs-bar{display:flex;align-items:center;gap:4px;padding:10px 28px;background:var(--surf);border-bottom:1px solid var(--red-border);overflow-x:auto;}
+.tabs-bar::-webkit-scrollbar{height:2px;}
+.tabs-bar::-webkit-scrollbar-thumb{background:var(--red-border);}
+.tab{display:flex;align-items:center;gap:7px;padding:8px 18px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);border:1px solid transparent;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .2s var(--ease);background:none;}
+.tab:hover{color:var(--text);background:var(--red-dim);}
+.tab.active{color:var(--red);border-color:var(--red-border);background:var(--red-dim);box-shadow:0 0 14px var(--red-glow);}
+.tab-icon{font-size:14px;}
+
+/* ── PANELS ── */
+.feature-panel{display:none;animation:fadeIn .3s var(--ease);}
+.feature-panel.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+.panel-wrap{max-width:1400px;margin:0 auto;padding:20px 28px;}
+
+/* ── COMMON PANEL BOX ── */
+.box{background:var(--surf);border:1px solid var(--red-border);border-radius:12px;overflow:hidden;}
+.box-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--red-border);}
+.box-title{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);}
+.box-title em{color:var(--red);font-style:normal;}
+.box-body{padding:16px;}
+
+/* ── CONTROLS SHARED ── */
+label.ctrl{display:block;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+select,input[type=text]{width:100%;background:var(--surf2);border:1px solid var(--red-border);color:var(--text);padding:8px 12px;font-size:11px;border-radius:6px;outline:none;transition:border-color .2s;}
+select:focus,input:focus{border-color:var(--red);}
+input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:var(--surf2);border-radius:2px;cursor:pointer;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red-glow);}
+.btn{padding:10px 20px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:7px;transition:all .2s var(--ease);}
+.btn-red{background:var(--red);color:#fff;border:none;}
+.btn-red:hover{box-shadow:0 0 24px var(--red-glow);transform:translateY(-2px);}
+.btn-outline{background:var(--red-dim);color:var(--red);border:1px solid var(--red-border);}
+.btn-outline:hover{background:rgba(232,0,45,.18);box-shadow:0 0 16px var(--red-glow);}
+.divider{height:1px;background:var(--red-border);margin:14px 0;}
+.tag{display:inline-block;padding:2px 8px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border-radius:3px;}
+.tag-red{background:rgba(232,0,45,.15);color:var(--red);border:1px solid var(--red-border);}
+.tag-green{background:rgba(34,221,136,.12);color:var(--green);border:1px solid rgba(34,221,136,.25);}
+.tag-gold{background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.25);}
+.tag-cyan{background:rgba(0,210,255,.12);color:var(--cyan);border:1px solid rgba(0,210,255,.25);}
+
+/* ══════════════════════════════
+   1. CIRCUIT HEATMAP
+══════════════════════════════ */
+#feat-circuit .layout{display:grid;grid-template-columns:1fr 260px;gap:16px;}
+#circuitSvg{width:100%;height:480px;}
+.hm-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.hm-btn{padding:5px 12px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border:1px solid var(--red-border);background:transparent;color:var(--muted);cursor:pointer;border-radius:4px;transition:all .2s;}
+.hm-btn.active,.hm-btn:hover{background:var(--red-dim);color:var(--red);border-color:var(--red);}
+.legend-bar{display:flex;height:12px;border-radius:4px;overflow:hidden;margin:8px 0;}
+.corner-list{margin-top:10px;}
+.corner-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--faint);font-size:10px;}
+.corner-item .cn{color:var(--muted);}
+.corner-item .ct{color:var(--text);font-weight:600;}
+
+/* ══════════════════════════════
+   2. SECTOR ANALYSIS
+══════════════════════════════ */
+#feat-sector .layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.sector-heatmap{overflow:auto;}
+.hm-table{width:100%;border-collapse:collapse;}
+.hm-table th{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--red-border);text-align:left;}
+.hm-table td{padding:9px 12px;border-bottom:1px solid var(--faint);font-size:12px;}
+.hm-cell{padding:7px 10px;border-radius:5px;font-size:11px;font-weight:700;text-align:center;transition:transform .2s;}
+.hm-cell:hover{transform:scale(1.08);}
+.sector-bars{display:flex;flex-direction:column;gap:10px;}
+.s-bar-wrap{display:flex;flex-direction:column;gap:4px;}
+.s-bar-label{display:flex;justify-content:space-between;font-size:10px;}
+.s-bar-track{height:18px;background:var(--surf2);border-radius:4px;overflow:hidden;position:relative;}
+.s-bar-fill{height:100%;border-radius:4px;transition:width .8s var(--ease);display:flex;align-items:center;padding-left:8px;font-size:9px;font-weight:700;color:#000;}
+.s-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:2px;}
+
+/* ══════════════════════════════
+   3. TYRE STRATEGY
+══════════════════════════════ */
+#feat-tyre .layout{display:grid;grid-template-columns:1fr 240px;gap:16px;}
+.strat-chart{overflow:auto;padding:16px;}
+.strat-lap-axis{display:flex;position:relative;height:20px;margin-bottom:4px;padding:0 110px;}
+.strat-lap-num{position:absolute;font-size:8px;color:var(--muted);transform:translateX(-50%);}
+.strat-row{display:flex;align-items:center;margin-bottom:10px;gap:0;}
+.strat-drv-label{width:110px;flex-shrink:0;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;}
+.strat-drv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.strat-track{flex:1;position:relative;height:26px;background:var(--surf2);border-radius:4px;overflow:hidden;}
+.stint-block{position:absolute;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;cursor:pointer;transition:filter .2s;letter-spacing:1px;}
+.stint-block:hover{filter:brightness(1.35);}
+.pit-vline{position:absolute;top:0;width:2px;height:100%;background:rgba(255,255,255,.55);z-index:5;}
+.lap-vline{position:absolute;top:-2px;width:2px;height:calc(100%+4px);background:var(--red);box-shadow:0 0 5px var(--red);z-index:10;transition:left .08s linear;pointer-events:none;}
+.tyre-stats .ts-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--faint);font-size:11px;}
+.tyre-stats .ts-row:last-child{border:none;}
+.tyre-stats .ts-label{color:var(--muted);font-size:10px;}
+.compound-legend{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.cl-item{display:flex;align-items:center;gap:10px;font-size:11px;}
+.cl-dot{width:10px;height:10px;border-radius:50%;}
+
+/* ══════════════════════════════
+   4. POSITION TRACE
+══════════════════════════════ */
+#feat-pos .layout{display:grid;grid-template-columns:1fr 220px;gap:16px;}
+#posCanvas{width:100%;display:block;}
+.pos-stats{display:flex;flex-direction:column;gap:10px;}
+.pos-stat-card{background:var(--surf2);border:1px solid var(--red-border);border-radius:8px;padding:12px;transition:all .2s;}
+.pos-stat-card:hover{border-color:var(--red);}
+.ps-drv{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;font-weight:700;}
+.ps-dot{width:8px;height:8px;border-radius:50%;}
+.ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.ps-item{font-size:9px;color:var(--muted);}
+.ps-item strong{display:block;font-size:12px;font-weight:700;color:var(--text);}
+.pos-lap-ctrl{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.lap-big{font-size:36px;font-weight:900;color:var(--red);text-shadow:0 0 20px var(--red-glow);line-height:1;}
+.play-btn{width:38px;height:38px;border-radius:50%;background:var(--red-dim);border:1px solid var(--red-border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
+.play-btn:hover{background:rgba(232,0,45,.2);box-shadow:0 0 16px var(--red-glow);}
+
+/* ══════════════════════════════
+   5. WHAT-IF SIMULATOR
+══════════════════════════════ */
+#feat-whatif .layout{display:grid;grid-template-columns:320px 1fr;gap:16px;}
+.wi-form{display:flex;flex-direction:column;gap:14px;}
+.wi-result-card{background:var(--surf2);border:1px solid var(--red-border);border-radius:10px;padding:14px;animation:fadeIn .3s var(--ease);}
+.wi-result-card h4{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:12px;}
+.wi-metric{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--faint);}
+.wi-metric:last-child{border:none;}
+.wi-metric-label{font-size:10px;color:var(--muted);}
+.wi-metric-val{font-size:14px;font-weight:700;}
+.wi-metric-val.gain{color:var(--green);}
+.wi-metric-val.loss{color:var(--red);}
+.wi-metric-val.neutral{color:var(--gold);}
+.sweep-chart-wrap{position:relative;}
+#sweepCanvas{width:100%;display:block;border-radius:8px;background:var(--surf2);}
+.verdict-banner{margin-top:12px;padding:12px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:10px;}
+.verdict-banner.better{background:rgba(34,221,136,.1);border:1px solid rgba(34,221,136,.25);color:var(--green);}
+.verdict-banner.worse{background:rgba(232,0,45,.1);border:1px solid var(--red-border);color:var(--red);}
+.verdict-banner.neutral{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);color:var(--gold);}
+
+/* ══════════════════════════════
+   6. RACE DEBRIEF
+══════════════════════════════ */
+#feat-debrief .layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.debrief-card{background:var(--surf2);border:1px solid var(--red-border);border-radius:10px;padding:16px;transition:all .25s;}
+.debrief-card:hover{border-color:var(--red);box-shadow:0 0 24px var(--red-glow);}
+.dc-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.dc-pos{font-size:28px;font-weight:900;color:var(--red);text-shadow:0 0 16px var(--red-glow);line-height:1;width:40px;}
+.dc-name{font-size:15px;font-weight:700;}
+.dc-team{font-size:10px;color:var(--muted);letter-spacing:1px;}
+.dc-metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.dc-metric{background:var(--surf);border-radius:6px;padding:8px;text-align:center;}
+.dc-metric .val{font-size:14px;font-weight:700;color:var(--text);}
+.dc-metric .lbl{font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}
+.dc-strat{font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px;}
+.dc-verdict{font-size:11px;font-weight:600;padding:8px 12px;border-radius:6px;}
+.dc-verdict.good{background:rgba(34,221,136,.1);color:var(--green);}
+.dc-verdict.bad{background:rgba(232,0,45,.1);color:var(--red);}
+.dc-verdict.ok{background:rgba(255,215,0,.08);color:var(--gold);}
+.debrief-summary{grid-column:1/-1;background:var(--surf);border:1px solid var(--red-border);border-radius:10px;padding:20px;}
+.sum-title{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:14px;}
+.sum-timeline{position:relative;padding-left:20px;}
+.sum-timeline::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:1px;background:var(--red-border);}
+.sum-event{position:relative;margin-bottom:14px;padding-left:12px;}
+.sum-event::before{content:'';position:absolute;left:-14px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--red);}
+.sum-event .ev-lap{font-size:9px;color:var(--red);letter-spacing:1.5px;font-weight:700;}
+.sum-event .ev-text{font-size:11px;color:var(--text);margin-top:2px;}
+
+/* tooltip */
+.tip{position:fixed;background:rgba(10,0,16,.95);border:1px solid var(--red-border);border-radius:8px;padding:8px 12px;font-size:11px;line-height:1.6;pointer-events:none;z-index:999;display:none;backdrop-filter:blur(8px);}
+.tip.show{display:block;}
+
+@media(max-width:900px){
+  #feat-circuit .layout,#feat-sector .layout,#feat-tyre .layout,
+  #feat-pos .layout,#feat-whatif .layout,#feat-debrief .layout{grid-template-columns:1fr;}
+  .tabs-bar{padding:8px 14px;}
+}
+</style>
+</head>
+<body>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<div id="particles"></div>
+<div class="tip" id="tip"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="f1-badge">F1</div>
+    <span class="nav-title">STRATEGY ANALYZER</span>
+  </div>
+  <div class="race-info">
+    <span>ROUND <strong>8</strong></span>
+    <span>CIRCUIT DE <strong>MONACO</strong></span>
+    <span>SEASON <strong>2023</strong></span>
+    <span>LAPS <strong>78</strong></span>
+    <span id="liveLap" style="color:var(--red);font-weight:700;">LAP 1</span>
+  </div>
+</nav>
+
+<!-- FEATURE TABS -->
+<div class="tabs-bar">
+  <button class="tab active" onclick="switchTab('circuit',this)">
+    <span class="tab-icon">🗺️</span>Circuit Heatmap
+  </button>
+  <button class="tab" onclick="switchTab('sector',this)">
+    <span class="tab-icon">📊</span>Sector Analysis
+  </button>
+  <button class="tab" onclick="switchTab('tyre',this)">
+    <span class="tab-icon">🏁</span>Tyre Strategy
+  </button>
+  <button class="tab" onclick="switchTab('pos',this)">
+    <span class="tab-icon">📈</span>Position Trace
+  </button>
+  <button class="tab" onclick="switchTab('whatif',this)">
+    <span class="tab-icon">🔮</span>What-If Simulator
+  </button>
+  <button class="tab" onclick="switchTab('debrief',this)">
+    <span class="tab-icon">🤖</span>Race Debrief
+  </button>
+</div>
+
+<!-- ══════════════════════════════
+     1. CIRCUIT HEATMAP
+══════════════════════════════ -->
+<div id="feat-circuit" class="feature-panel active">
+<div class="panel-wrap">
+  <div class="layout">
+    <div class="box">
+      <div class="box-hdr">
+        <div class="box-title"><em>CIRCUIT MAP</em> · Monaco · 3.337 km</div>
+        <div class="hm-btns">
+          <button class="hm-btn active" onclick="setHM('sector',this)">SECTOR SPLITS</button>
+          <button class="hm-btn" onclick="setHM('speed',this)">SPEED ZONES</button>
+          <button class="hm-btn" onclick="setHM('brake',this)">BRAKE ZONES</button>
+          <button class="hm-btn" onclick="setHM('gear',this)">GEAR MAP</button>
+        </div>
+      </div>
+      <svg id="circuitSvg" viewBox="0 0 820 500" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="sglow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <radialGradient id="bgG" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stop-color="rgba(232,0,45,0.05)"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </radialGradient>
+        </defs>
+        <rect width="820" height="500" fill="url(#bgG)"/>
+        <g id="trackG"></g><g id="sfG"></g><g id="labelsG"></g><g id="carsG"></g>
+      </svg>
+      <!-- Speed/gear legend -->
+      <div id="hmLegend" style="padding:10px 16px;border-top:1px solid var(--red-border);display:flex;align-items:center;gap:14px;font-size:10px;color:var(--muted);">
+        <span>S1 <span style="color:#00D2FF">●</span> Sainte Devote → Casino</span>
+        <span>S2 <span style="color:#FFD700">●</span> Casino → Swimming Pool</span>
+        <span>S3 <span style="color:#B347FF">●</span> Swimming Pool → S/F</span>
+      </div>
+    </div>
+
+    <!-- Right controls -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">LAP <em>SCRUBBER</em></div></div>
+        <div class="box-body">
+          <label class="ctrl">Current Lap</label>
+          <div style="font-size:38px;font-weight:900;color:var(--red);text-shadow:0 0 20px var(--red-glow);line-height:1;" id="circLapNum">1 <span style="font-size:14px;font-weight:400;color:var(--muted);">/ 78</span></div>
+          <input type="range" id="circLapSlider" min="1" max="78" value="1" style="margin-top:10px;">
+          <div class="divider"></div>
+          <label class="ctrl">Focus Driver</label>
+          <select id="circDrv">
+            <option value="VER">Verstappen · Red Bull</option>
+            <option value="ALO">Alonso · Aston Martin</option>
+            <option value="LEC">Leclerc · Ferrari</option>
+            <option value="HAM">Hamilton · Mercedes</option>
+            <option value="SAI">Sainz · Ferrari</option>
+          </select>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">CORNER <em>GUIDE</em></div></div>
+        <div class="box-body" style="padding:10px 14px;">
+          <div class="corner-list" id="cornerList"></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">HEATMAP <em>LEGEND</em></div></div>
+        <div class="box-body">
+          <div id="legendContent" style="font-size:10px;color:var(--muted);line-height:1.9;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════
+     2. SECTOR ANALYSIS
+══════════════════════════════ -->
+<div id="feat-sector" class="feature-panel">
+<div class="panel-wrap">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+    <div>
+      <label class="ctrl" style="margin:0 0 4px;">Select Driver</label>
+      <select id="sectorDrv" onchange="renderSectorAnalysis()" style="width:200px;">
+        <option value="ALL">All Drivers</option>
+        <option value="VER">Verstappen</option>
+        <option value="ALO">Alonso</option>
+        <option value="LEC">Leclerc</option>
+        <option value="HAM">Hamilton</option>
+        <option value="SAI">Sainz</option>
+      </select>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;" id="sectorTagRow"></div>
+  </div>
+  <div class="layout">
+    <div class="box">
+      <div class="box-hdr">
+        <div class="box-title">SECTOR <em>HEATMAP</em> — Delta to Best (seconds)</div>
+        <span class="tag tag-red">GREEN = FASTER</span>
+      </div>
+      <div class="box-body sector-heatmap">
+        <table class="hm-table" id="sectorTable"></table>
+      </div>
+    </div>
+    <div class="box">
+      <div class="box-hdr"><div class="box-title">SECTOR <em>BAR CHART</em></div></div>
+      <div class="box-body">
+        <div class="sector-bars" id="sectorBars"></div>
+      </div>
+    </div>
+  </div>
+  <div class="layout" style="margin-top:14px;">
+    <div class="box">
+      <div class="box-hdr"><div class="box-title">LAP TIME <em>DISTRIBUTION</em></div></div>
+      <canvas id="lapDistCanvas" height="160" style="width:100%;display:block;padding:12px;"></canvas>
+    </div>
+    <div class="box">
+      <div class="box-hdr"><div class="box-title">SECTOR DOMINANCE <em>SUMMARY</em></div></div>
+      <div class="box-body" id="sectorDominance"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════
+     3. TYRE STRATEGY
+══════════════════════════════ -->
+<div id="feat-tyre" class="feature-panel">
+<div class="panel-wrap">
+  <div class="layout">
+    <div class="box">
+      <div class="box-hdr">
+        <div class="box-title">TYRE <em>STRATEGY</em> — All Drivers · All 78 Laps</div>
+        <div style="display:flex;gap:8px;font-size:10px;">
+          <span style="color:#E8002D;font-weight:700;">● SOFT</span>
+          <span style="color:#FFD700;font-weight:700;">● MEDIUM</span>
+          <span style="color:#C8C8C8;font-weight:700;">● HARD</span>
+        </div>
+      </div>
+      <div class="strat-chart">
+        <div class="strat-lap-axis" id="stratAxis"></div>
+        <div id="stratRows"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">LAP <em>CONTROL</em></div></div>
+        <div class="box-body">
+          <label class="ctrl">Lap</label>
+          <div style="font-size:36px;font-weight:900;color:var(--red);text-shadow:0 0 18px var(--red-glow);line-height:1;" id="tyreLapNum">1 <span style="font-size:13px;color:var(--muted);font-weight:400;">/ 78</span></div>
+          <input type="range" id="tyreLapSlider" min="1" max="78" value="1" style="margin-top:8px;">
+          <div class="divider"></div>
+          <label class="ctrl">Driver</label>
+          <select id="tyreDrv" onchange="renderTyreStats()">
+            <option value="VER">Verstappen</option>
+            <option value="ALO">Alonso</option>
+            <option value="LEC">Leclerc</option>
+            <option value="HAM">Hamilton</option>
+            <option value="SAI">Sainz</option>
+          </select>
+          <div class="divider"></div>
+          <div class="tyre-stats" id="tyreStats"></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">COMPOUND <em>LEGEND</em></div></div>
+        <div class="box-body">
+          <div class="compound-legend">
+            <div class="cl-item"><div class="cl-dot" style="background:#E8002D;box-shadow:0 0 6px rgba(232,0,45,.5)"></div><div><div style="font-weight:700;font-size:11px;">SOFT (S)</div><div style="font-size:10px;color:var(--muted);">Fastest — 15–25 lap life at Monaco</div></div></div>
+            <div class="cl-item"><div class="cl-dot" style="background:#FFD700;box-shadow:0 0 6px rgba(255,215,0,.4)"></div><div><div style="font-weight:700;font-size:11px;">MEDIUM (M)</div><div style="font-size:10px;color:var(--muted);">Balanced — 30–40 lap life</div></div></div>
+            <div class="cl-item"><div class="cl-dot" style="background:#C8C8C8"></div><div><div style="font-weight:700;font-size:11px;">HARD (H)</div><div style="font-size:10px;color:var(--muted);">Durable — 40–55 lap life</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════
+     4. POSITION TRACE
+══════════════════════════════ -->
+<div id="feat-pos" class="feature-panel">
+<div class="panel-wrap">
+  <div class="layout">
+    <div class="box" style="display:flex;flex-direction:column;">
+      <div class="box-hdr">
+        <div class="box-title">POSITION <em>TRACE</em> — Lap-by-Lap · ▲ = Pit Stop</div>
+        <div style="display:flex;gap:8px;" id="posLegend"></div>
+      </div>
+      <canvas id="posCanvas" style="flex:1;min-height:420px;"></canvas>
+      <div style="padding:12px 16px;border-top:1px solid var(--red-border);display:flex;align-items:center;gap:16px;">
+        <label class="ctrl" style="margin:0;white-space:nowrap;">Lap:</label>
+        <input type="range" id="posLapSlider" min="1" max="78" value="78" style="flex:1;">
+        <div class="pos-lap-ctrl">
+          <div class="lap-big" id="posLapNum">78</div>
+          <button class="play-btn" id="posPlayBtn" onclick="togglePlay()">▶</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:520px;" id="posStatCards"></div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════
+     5. WHAT-IF SIMULATOR
+══════════════════════════════ -->
+<div id="feat-whatif" class="feature-panel">
+<div class="panel-wrap">
+  <div class="layout">
+    <div class="box">
+      <div class="box-hdr"><div class="box-title">🔮 STRATEGY <em>SIMULATOR</em></div></div>
+      <div class="box-body wi-form">
+        <div>
+          <label class="ctrl">Driver</label>
+          <select id="wiDrv" onchange="runWhatIf()">
+            <option value="VER">Verstappen · Red Bull</option>
+            <option value="ALO">Alonso · Aston Martin</option>
+            <option value="LEC">Leclerc · Ferrari</option>
+            <option value="HAM" selected>Hamilton · Mercedes</option>
+            <option value="SAI">Sainz · Ferrari</option>
+          </select>
+        </div>
+        <div>
+          <label class="ctrl">Simulated Pit Lap</label>
+          <input type="range" id="wiLapSlider" min="5" max="70" value="25" oninput="document.getElementById('wiLapVal').textContent=this.value;runWhatIf()">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;">
+            <span>Lap 5</span><span style="color:var(--red);font-weight:700;">Lap <span id="wiLapVal">25</span></span><span>Lap 70</span>
+          </div>
+        </div>
+        <div>
+          <label class="ctrl">New Compound After Pit</label>
+          <select id="wiCompound" onchange="runWhatIf()">
+            <option value="MEDIUM">Medium</option>
+            <option value="HARD">Hard</option>
+            <option value="SOFT">Soft</option>
+          </select>
+        </div>
+        <div class="divider"></div>
+        <div id="wiResultCard" class="wi-result-card" style="display:none;"></div>
+        <div id="wiVerdict" class="verdict-banner" style="display:none;"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="box">
+        <div class="box-hdr">
+          <div class="box-title">PIT WINDOW <em>SWEEP</em> — All Possible Laps</div>
+          <span class="tag tag-green">GREEN = BETTER THAN ACTUAL</span>
+        </div>
+        <canvas id="sweepCanvas" height="220" style="width:100%;display:block;padding:12px;background:var(--surf2);"></canvas>
+      </div>
+      <div class="box">
+        <div class="box-hdr"><div class="box-title">STRATEGY <em>COMPARISON TABLE</em></div></div>
+        <div class="box-body" id="wiCompareTable"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════
+     6. RACE DEBRIEF
+══════════════════════════════ -->
+<div id="feat-debrief" class="feature-panel">
+<div class="panel-wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div>
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:4px;">POST-RACE INTELLIGENCE REPORT</div>
+      <div style="font-size:22px;font-weight:900;letter-spacing:-0.5px;">Monaco Grand Prix <span style="color:var(--red)">2023</span></div>
+    </div>
+    <button class="btn btn-outline" onclick="exportDebrief()">⬇ EXPORT REPORT</button>
+  </div>
+  <div class="layout" id="debriefCards"></div>
+  <div class="box" style="margin-top:14px;" id="debriefSummaryBox"></div>
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  CURSOR
+// ══════════════════════════════════════
+const cur=document.getElementById('cursor'),curR=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+setInterval(()=>{rx+=(mx-rx)*.12;ry+=(my-ry)*.12;curR.style.left=rx+'px';curR.style.top=ry+'px';},16);
+document.querySelectorAll('button,select,input,.tab').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cur.style.transform='translate(-50%,-50%) scale(2)';curR.style.width='56px';curR.style.height='56px';curR.style.borderColor='rgba(232,0,45,.9)';});
+  el.addEventListener('mouseleave',()=>{cur.style.transform='translate(-50%,-50%) scale(1)';curR.style.width='34px';curR.style.height='34px';curR.style.borderColor='rgba(232,0,45,.5)';});
+});
+// Particles
+const pc=document.getElementById('particles');
+for(let i=0;i<22;i++){const p=document.createElement('div');p.className='pt';p.style.cssText=`left:${Math.random()*100}%;animation-duration:${Math.random()*12+8}s;animation-delay:${Math.random()*10}s;`;pc.appendChild(p);}
+
+// ══════════════════════════════════════
+//  TAB SWITCHING
+// ══════════════════════════════════════
+function switchTab(id,btn){
+  document.querySelectorAll('.feature-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('feat-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='sector')renderSectorAnalysis();
+  if(id==='debrief')renderDebrief();
+  if(id==='pos'){renderPosChart(posLap);renderPosStatCards();}
+  if(id==='whatif')runWhatIf();
+}
+
+// ══════════════════════════════════════
+//  RACE DATA
+// ══════════════════════════════════════
+const LAPS=78;
+const DRIVERS=[
+  {id:'VER',name:'Verstappen',abbr:'VER',team:'Red Bull',color:'#3671C6',
+   stints:[{s:1,e:29,c:'M',bg:'#FFD700',fg:'#000'},{s:30,e:78,c:'H',bg:'#CCCCCC',fg:'#000'}],
+   pits:[29],
+   s1:[24.8,24.6,24.5,24.7,24.6],s2:[36.2,36.0,35.9,36.1,36.0],s3:[17.8,17.6,17.5,17.7,17.6],
+   pos:interp([[1,3],[5,2],[10,1],[29,1],[30,2],[34,1],[78,1]])},
+  {id:'ALO',name:'Alonso',abbr:'ALO',team:'Aston Martin',color:'#358C75',
+   stints:[{s:1,e:78,c:'M',bg:'#FFD700',fg:'#000'}],
+   pits:[],
+   s1:[25.1,25.0,24.9,25.2,25.1],s2:[36.8,36.6,36.5,36.7,36.6],s3:[18.0,17.9,17.8,18.0,17.9],
+   pos:interp([[1,5],[8,4],[18,3],[29,4],[40,3],[55,2],[78,2]])},
+  {id:'LEC',name:'Leclerc',abbr:'LEC',team:'Ferrari',color:'#E8002D',
+   stints:[{s:1,e:24,c:'S',bg:'#E8002D',fg:'#fff'},{s:25,e:78,c:'M',bg:'#FFD700',fg:'#000'}],
+   pits:[24],
+   s1:[24.5,24.3,24.2,24.4,24.3],s2:[35.8,35.6,35.5,35.7,35.6],s3:[17.5,17.4,17.3,17.5,17.4],
+   pos:interp([[1,1],[24,1],[25,4],[35,4],[50,3],[78,3]])},
+  {id:'HAM',name:'Hamilton',abbr:'HAM',team:'Mercedes',color:'#27F4D2',
+   stints:[{s:1,e:32,c:'M',bg:'#FFD700',fg:'#000'},{s:33,e:78,c:'H',bg:'#CCCCCC',fg:'#000'}],
+   pits:[32],
+   s1:[25.3,25.1,25.0,25.2,25.1],s2:[37.0,36.8,36.7,36.9,36.8],s3:[18.2,18.1,18.0,18.2,18.1],
+   pos:interp([[1,6],[10,5],[20,4],[32,4],[33,5],[50,4],[78,4]])},
+  {id:'SAI',name:'Sainz',abbr:'SAI',team:'Ferrari',color:'#FF8800',
+   stints:[{s:1,e:27,c:'S',bg:'#E8002D',fg:'#fff'},{s:28,e:78,c:'M',bg:'#FFD700',fg:'#000'}],
+   pits:[27],
+   s1:[24.7,24.5,24.4,24.6,24.5],s2:[36.1,35.9,35.8,36.0,35.9],s3:[17.7,17.6,17.5,17.7,17.6],
+   pos:interp([[1,2],[8,3],[18,5],[27,5],[28,6],[50,5],[78,5]])}
+];
+
+function interp(kp){
+  const d=new Array(LAPS+1).fill(0);
+  for(let i=0;i<kp.length-1;i++){
+    const[l1,p1]=kp[i],[l2,p2]=kp[i+1];
+    for(let l=l1;l<=l2;l++){const t=(l-l1)/(l2-l1);d[l]=Math.round(p1+(p2-p1)*t);}
+  }return d;
+}
+
+// ══════════════════════════════════════
+//  1. CIRCUIT HEATMAP
+// ══════════════════════════════════════
+const PATH=[
+  [405,440],[455,440],[508,437],[552,431],[588,421],[618,405],[636,385],
+  [643,361],[646,335],[640,307],[629,280],[614,253],[597,229],[577,207],
+  [553,191],[526,181],[498,177],[470,179],[446,189],[426,205],[411,223],
+  [402,245],[397,269],[395,292],[397,313],[404,332],[417,342],[434,346],
+  [455,343],[477,335],[502,323],[530,306],[560,286],[592,263],[620,239],
+  [644,214],[660,189],[665,166],[659,145],[646,132],[628,125],[607,123],
+  [583,127],[562,137],[544,152],[534,171],[528,189],[526,208],[530,225],
+  [540,237],[552,241],[563,234],[566,220],[557,205],[543,200],[525,205],
+  [509,218],[496,235],[486,254],[480,278],[477,305],[475,333],[469,361],
+  [458,389],[444,415],[421,433],[405,440]
+];
+const S1E=18,S2E=45;
+const SPEED_V=[.70,.88,1.00,.90,.85,.92,.78,.72,.80,.88,.84,.80,.75,.68,.62,.58,.55,.62,.68,.58,.54,.50,.48,.52,.58,.65,.72,.78,.84,.88,.91,.94,.97,1.00,.96,.90,.84,.78,.70,.64,.58,.52,.55,.60,.54,.60,.65,.70,.75,.68,.62,.56,.52,.50,.54,.58,.56,.54,.52,.58,.62,.58,.56,.60,.66,.72,.68,.64,.70,.76,.82,.86];
+const BRAKE_V=[.1,.2,.1,.3,.8,.2,.1,.9,.3,.1,.7,.2,.6,.8,.4,.9,.7,.3,.5,.8,.9,.7,.6,.4,.7,.3,.2,.1,.2,.1,.1,.2,.1,.1,.2,.3,.5,.7,.8,.9,.7,.8,.6,.5,.8,.6,.4,.3,.5,.7,.8,.9,.7,.6,.5,.4,.6,.8,.7,.5,.6,.7,.5,.4,.5,.4,.6,.7,.5,.4,.3,.4,.5,.4];
+const GEAR_V=[3,4,6,5,4,5,3,2,4,5,4,3,2,1,2,1,2,3,4,2,1,1,1,2,3,4,5,6,7,8,7,6,5,4,3,4,5,6,7,6,5,4,3,2,3,2,3,4,5,4,3,2,1,2,3,2,3,4,3,4,5,4,3,4,5,6,5,4,5,6,7,6,5,4];
+
+let hmMode='sector';
+function segColor(i,mode){
+  if(mode==='sector'){
+    if(i<=S1E)return'#00D2FF';if(i<=S2E)return'#FFD700';return'#B347FF';
+  }
+  if(mode==='speed'){const s=SPEED_V[i%SPEED_V.length];return`hsl(${s>=.8?120:(s-.4)/.4*120},80%,${38+s*18}%)`;}
+  if(mode==='brake'){const b=BRAKE_V[i%BRAKE_V.length];return`hsl(${(1-b)*110},80%,${38+b*14}%)`;}
+  const g=GEAR_V[i%GEAR_V.length];const hue=40+g/8*220;return`hsl(${hue},75%,48%)`;
+}
+function setHM(mode,btn){
+  hmMode=mode;
+  document.querySelectorAll('.hm-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drawCircuit();drawCars(circLap);
+  updateLegend(mode);
+}
+function updateLegend(mode){
+  const el=document.getElementById('legendContent');
+  const legends={
+    sector:'<div style="display:flex;gap:16px;"><span><span style="color:#00D2FF">■</span> Sector 1 — Casino Square entry</span><span><span style="color:#FFD700">■</span> Sector 2 — Tunnel & chicane</span><span><span style="color:#B347FF">■</span> Sector 3 — Rascasse to S/F</span></div>',
+    speed:'<div style="display:flex;align-items:center;gap:10px;"><div style="height:10px;flex:1;background:linear-gradient(to right,hsl(0,80%,42%),hsl(60,80%,48%),hsl(120,80%,45%));border-radius:4px;"></div><span style="margin-left:4px;color:var(--muted);">Slow → Fast</span></div>',
+    brake:'<div style="display:flex;align-items:center;gap:10px;"><div style="height:10px;flex:1;background:linear-gradient(to right,hsl(110,80%,42%),hsl(55,80%,48%),hsl(0,80%,45%));border-radius:4px;"></div><span style="margin-left:4px;color:var(--muted);">Light → Heavy Braking</span></div>',
+    gear:'<div style="display:flex;align-items:center;gap:10px;"><div style="height:10px;flex:1;background:linear-gradient(to right,hsl(40,75%,48%),hsl(180,75%,48%),hsl(260,75%,48%));border-radius:4px;"></div><span style="margin-left:4px;color:var(--muted);">Gear 1 → Gear 8</span></div>',
+  };
+  el.innerHTML=legends[mode]||'';
+}
+
+const CORNERS=[
+  [5,'T1','Sainte Devote'],[10,'T2','Beau Rivage'],
+  [14,'T3','Massenet'],[17,'T4','Casino Square'],
+  [21,'T5','Mirabeau'],[25,'T6','Loews Hairpin'],
+  [32,'T7','Portier'],[38,'T8','Tunnel Exit'],
+  [44,'T9','Chicane'],[50,'T10','Swimming Pool'],
+  [57,'T11','Rascasse'],[62,'T12','Anthony Noghes'],
+];
+
+function drawCircuit(){
+  const g=document.getElementById('trackG');g.innerHTML='';
+  for(let i=0;i<PATH.length-1;i++){
+    const[x1,y1]=PATH[i],[x2,y2]=PATH[i+1];
+    const sh=document.createElementNS('http://www.w3.org/2000/svg','line');
+    sh.setAttribute('x1',x1);sh.setAttribute('y1',y1);sh.setAttribute('x2',x2);sh.setAttribute('y2',y2);
+    sh.setAttribute('stroke','rgba(0,0,0,.92)');sh.setAttribute('stroke-width','18');sh.setAttribute('stroke-linecap','round');
+    g.appendChild(sh);
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',x1);ln.setAttribute('y1',y1);ln.setAttribute('x2',x2);ln.setAttribute('y2',y2);
+    ln.setAttribute('stroke',segColor(i,hmMode));ln.setAttribute('stroke-width','7');ln.setAttribute('stroke-linecap','round');
+    ln.setAttribute('filter','url(#glow)');ln.setAttribute('opacity','.92');g.appendChild(ln);
+  }
+  // S/F
+  const sf=document.getElementById('sfG');sf.innerHTML='';
+  const[sx,sy]=PATH[0];
+  const sfl=document.createElementNS('http://www.w3.org/2000/svg','line');
+  sfl.setAttribute('x1',sx-14);sfl.setAttribute('y1',sy);sfl.setAttribute('x2',sx+14);sfl.setAttribute('y2',sy);
+  sfl.setAttribute('stroke','#fff');sfl.setAttribute('stroke-width','3');sfl.setAttribute('filter','url(#glow)');sf.appendChild(sfl);
+  // Labels
+  const lg=document.getElementById('labelsG');lg.innerHTML='';
+  CORNERS.forEach(([idx,short,full])=>{
+    if(idx>=PATH.length)return;
+    const[cx,cy]=PATH[idx];
+    const d=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    d.setAttribute('cx',cx);d.setAttribute('cy',cy);d.setAttribute('r','4');
+    d.setAttribute('fill','rgba(255,255,255,.18)');d.setAttribute('stroke','rgba(255,255,255,.3)');d.setAttribute('stroke-width','1');
+    d.style.cursor='none';
+    d.addEventListener('mouseenter',e=>showTip(e,`<strong>${short}</strong> — ${full}`));
+    d.addEventListener('mouseleave',hideTip);
+    lg.appendChild(d);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',cx+8);t.setAttribute('y',cy+3);
+    t.setAttribute('fill','rgba(255,210,225,.35)');t.setAttribute('font-size','8');
+    t.setAttribute('font-family','Segoe UI,sans-serif');t.setAttribute('pointer-events','none');
+    t.textContent=short;lg.appendChild(t);
+  });
+  // Corner list sidebar
+  const cl=document.getElementById('cornerList');cl.innerHTML='';
+  CORNERS.forEach(([idx,short,full])=>{
+    const row=document.createElement('div');row.className='corner-item';
+    row.innerHTML=`<span class="cn">${short}</span><span class="ct">${full}</span>`;cl.appendChild(row);
+  });
+}
+
+function pathXY(prog){
+  const n=PATH.length-1,idx=prog*n,i=Math.min(Math.floor(idx),n-1),t=idx-i;
+  const[x1,y1]=PATH[i],[x2,y2]=PATH[Math.min(i+1,n)];
+  return[x1+(x2-x1)*t,y1+(y2-y1)*t];
+}
+function carProg(drv,lap){
+  const p=drv.pos[Math.min(lap,LAPS)]||1;
+  return Math.max(.05,Math.min(.97,.88-(p-1)*.07+Math.sin(lap*.31+drv.id.charCodeAt(0))*.018));
+}
+function stint4lap(drv,lap){
+  for(const s of drv.stints)if(lap>=s.s&&lap<=s.e)return{S:'Soft',M:'Medium',H:'Hard'}[s.c]||s.c;
+  return'?';
+}
+function drawCars(lap){
+  const g=document.getElementById('carsG');g.innerHTML='';
+  const sel=document.getElementById('circDrv')?.value;
+  DRIVERS.forEach(drv=>{
+    const prog=carProg(drv,lap),pos=drv.pos[Math.min(lap,LAPS)];
+    const[x,y]=pathXY(prog),isSel=drv.id===sel;
+    if(isSel){const gl=document.createElementNS('http://www.w3.org/2000/svg','circle');gl.setAttribute('cx',x);gl.setAttribute('cy',y);gl.setAttribute('r','20');gl.setAttribute('fill',drv.color+'20');gl.setAttribute('filter','url(#sglow)');g.appendChild(gl);}
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',isSel?11:7);
+    c.setAttribute('fill',drv.color);c.setAttribute('stroke',isSel?'#fff':'rgba(255,255,255,.2)');
+    c.setAttribute('stroke-width',isSel?2:1);c.setAttribute('filter','url(#glow)');c.style.cursor='none';
+    c.addEventListener('mouseenter',e=>showTip(e,`<strong>${drv.name}</strong><br>P${pos} · Lap ${lap}<br>Tyre: ${stint4lap(drv,lap)}<br>Team: ${drv.team}`));
+    c.addEventListener('mouseleave',hideTip);g.appendChild(c);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x);t.setAttribute('y',y+3.5);t.setAttribute('text-anchor','middle');
+    t.setAttribute('font-size','7');t.setAttribute('font-weight','800');t.setAttribute('fill','#fff');t.setAttribute('pointer-events','none');
+    t.textContent=pos;g.appendChild(t);
+  });
+}
+
+let circLap=1;
+document.getElementById('circLapSlider').addEventListener('input',e=>{
+  circLap=+e.target.value;
+  document.getElementById('circLapNum').innerHTML=`${circLap} <span style="font-size:14px;font-weight:400;color:var(--muted);">/ 78</span>`;
+  document.getElementById('liveLap').textContent='LAP '+circLap;
+  drawCars(circLap);
+});
+document.getElementById('circDrv').addEventListener('change',()=>drawCars(circLap));
+
+// ══════════════════════════════════════
+//  2. SECTOR ANALYSIS
+// ══════════════════════════════════════
+const SECTOR_DATA={
+  VER:{s1:24.61,s2:36.04,s3:17.63,avg:78.28,best:77.88,color:'#3671C6'},
+  ALO:{s1:25.06,s2:36.64,s3:17.92,avg:79.62,best:79.10,color:'#358C75'},
+  LEC:{s1:24.36,s2:35.64,s3:17.42,avg:77.42,best:76.95,color:'#E8002D'},
+  HAM:{s1:25.12,s2:36.84,s3:18.14,avg:80.10,best:79.55,color:'#27F4D2'},
+  SAI:{s1:24.52,s2:35.94,s3:17.58,avg:78.04,best:77.60,color:'#FF8800'},
+};
+
+function renderSectorAnalysis(){
+  const drvIds=['VER','ALO','LEC','HAM','SAI'];
+  const bestS1=Math.min(...drvIds.map(d=>SECTOR_DATA[d].s1));
+  const bestS2=Math.min(...drvIds.map(d=>SECTOR_DATA[d].s2));
+  const bestS3=Math.min(...drvIds.map(d=>SECTOR_DATA[d].s3));
+
+  // Heatmap table
+  const tbl=document.getElementById('sectorTable');
+  tbl.innerHTML=`<tr><th>Driver</th><th>Sector 1</th><th>Sector 2</th><th>Sector 3</th><th>Avg Lap</th><th>Best Lap</th></tr>`;
+  drvIds.forEach(id=>{
+    const d=SECTOR_DATA[id],drv=DRIVERS.find(x=>x.id===id);
+    const ds1=(d.s1-bestS1),ds2=(d.s2-bestS2),ds3=(d.s3-bestS3);
+    function cellColor(delta){
+      if(delta<=0.01)return'hsl(120,70%,28%)';
+      if(delta<.2)return'hsl(80,70%,28%)';
+      if(delta<.4)return'hsl(50,75%,28%)';
+      if(delta<.7)return'hsl(25,75%,28%)';
+      return'hsl(0,70%,28%)';
+    }
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:50%;background:${d.color};box-shadow:0 0 6px ${d.color}60"></div><span style="font-weight:700;">${drv.name}</span></div></td>
+      <td><div class="hm-cell" style="background:${cellColor(ds1)};color:#fff;">${d.s1.toFixed(3)}s<br><small style="font-weight:400;opacity:.7;">${ds1<=0.001?'▲BEST':'+'+ds1.toFixed(3)}</small></div></td>
+      <td><div class="hm-cell" style="background:${cellColor(ds2)};color:#fff;">${d.s2.toFixed(3)}s<br><small style="font-weight:400;opacity:.7;">${ds2<=0.001?'▲BEST':'+'+ds2.toFixed(3)}</small></div></td>
+      <td><div class="hm-cell" style="background:${cellColor(ds3)};color:#fff;">${d.s3.toFixed(3)}s<br><small style="font-weight:400;opacity:.7;">${ds3<=0.001?'▲BEST':'+'+ds3.toFixed(3)}</small></div></td>
+      <td style="font-weight:700;">${d.avg.toFixed(3)}s</td>
+      <td style="color:var(--red);font-weight:700;">${d.best.toFixed(3)}s</td>`;
+    tbl.appendChild(tr);
+  });
+
+  // Bar chart
+  const barsEl=document.getElementById('sectorBars');barsEl.innerHTML='';
+  ['s1','s2','s3'].forEach((sec,si)=>{
+    const label=['Sector 1','Sector 2','Sector 3'][si];
+    const max=Math.max(...drvIds.map(d=>SECTOR_DATA[d][sec]));
+    const div=document.createElement('div');div.style.marginBottom='18px';
+    div.innerHTML=`<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">${label}</div>`;
+    drvIds.forEach(id=>{
+      const d=SECTOR_DATA[id],drv=DRIVERS.find(x=>x.id===id);
+      const pct=d[sec]/max*100;
+      div.innerHTML+=`
+        <div class="s-bar-wrap">
+          <div class="s-bar-label"><span>${drv.name}</span><span style="color:var(--muted);">${d[sec].toFixed(3)}s</span></div>
+          <div class="s-bar-track"><div class="s-bar-fill" style="width:${pct}%;background:${d.color};">${d[sec].toFixed(3)}</div></div>
+        </div>`;
+    });
+    barsEl.appendChild(div);
+  });
+
+  // Lap dist canvas
+  const cv=document.getElementById('lapDistCanvas');
+  const pr=cv.parentElement;cv.width=pr.offsetWidth-24;cv.height=160;
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+  const P={t:10,r:12,b:24,l:36};
+  const W=cv.width-P.l-P.r,H=cv.height-P.t-P.b;
+  // Generate synthetic lap time distributions
+  DRIVERS.forEach(drv=>{
+    const d=SECTOR_DATA[drv.id];
+    ctx.beginPath();ctx.strokeStyle=drv.color;ctx.lineWidth=2;
+    const pts=Array.from({length:50},(_,i)=>{
+      const t=(i/49)*10;
+      const peak=d.avg,spread=.8;
+      const v=Math.exp(-(t-5)*(t-5)/(2*spread*spread))*H*.7;
+      return{x:P.l+i/49*W,y:P.t+H-v};
+    });
+    pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+  });
+  // axes
+  ctx.strokeStyle='rgba(255,200,215,.2)';ctx.lineWidth=1;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(P.l,P.t);ctx.lineTo(P.l,P.t+H);ctx.lineTo(P.l+W,P.t+H);ctx.stroke();
+  ctx.fillStyle='rgba(255,200,215,.3)';ctx.font='9px Segoe UI';
+  ctx.fillText('Lap Time Distribution',P.l+4,P.t+12);
+
+  // Sector dominance
+  const dom=document.getElementById('sectorDominance');dom.innerHTML='';
+  ['s1','s2','s3'].forEach((sec,si)=>{
+    const winner=drvIds.reduce((a,b)=>SECTOR_DATA[a][sec]<SECTOR_DATA[b][sec]?a:b);
+    const wdrv=DRIVERS.find(d=>d.id===winner);
+    const wdata=SECTOR_DATA[winner];
+    dom.innerHTML+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--faint);">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);width:60px;">SECTOR ${si+1}</div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${wdata.color};box-shadow:0 0 6px ${wdata.color}60;flex-shrink:0;"></div>
+      <div style="flex:1;"><div style="font-weight:700;font-size:12px;">${wdrv.name}</div><div style="font-size:10px;color:var(--muted);">${wdata[sec].toFixed(3)}s — Best in sector</div></div>
+      <span class="tag tag-green">▲ FASTEST</span>
+    </div>`;
+  });
+
+  // Tags
+  const tagRow=document.getElementById('sectorTagRow');tagRow.innerHTML='';
+  const fastestOverall=drvIds.reduce((a,b)=>SECTOR_DATA[a].best<SECTOR_DATA[b].best?a:b);
+  const fodrv=DRIVERS.find(d=>d.id===fastestOverall);
+  tagRow.innerHTML=`<span class="tag tag-red">Fastest Overall: ${fodrv.name} · ${SECTOR_DATA[fastestOverall].best.toFixed(3)}s</span>`;
+}
+
+// ══════════════════════════════════════
+//  3. TYRE STRATEGY
+// ══════════════════════════════════════
+function renderTyreStrategy(lap){
+  const axis=document.getElementById('stratAxis');axis.innerHTML='';
+  [1,10,20,30,40,50,60,70,78].forEach(l=>{
+    const sp=document.createElement('span');sp.className='strat-lap-num';
+    sp.style.left=(l-1)/(LAPS-1)*100+'%';sp.textContent=l;axis.appendChild(sp);
+  });
+  const rows=document.getElementById('stratRows');rows.innerHTML='';
+  DRIVERS.forEach(drv=>{
+    const pos=drv.pos[Math.min(lap,LAPS)];
+    const row=document.createElement('div');row.className='strat-row';
+    row.innerHTML=`<div class="strat-drv-label"><div class="strat-drv-dot" style="background:${drv.color};box-shadow:0 0 5px ${drv.color}60"></div>${drv.abbr} <span style="color:var(--muted);font-weight:400;font-size:10px;">P${pos}</span></div>`;
+    const track=document.createElement('div');track.className='strat-track';
+    drv.stints.forEach(st=>{
+      const lp=(st.s-1)/LAPS*100,wp=(st.e-st.s+1)/LAPS*100;
+      const bl=document.createElement('div');bl.className='stint-block';
+      bl.style.cssText=`left:${lp}%;width:${wp}%;background:${st.bg};color:${st.fg};`;
+      bl.textContent=st.c;
+      const cname={S:'Soft',M:'Medium',H:'Hard'}[st.c];
+      bl.addEventListener('mouseenter',e=>showTip(e,`<strong>${drv.name}</strong><br>${cname} Compound<br>Laps ${st.s}–${st.e} (${st.e-st.s+1} laps)`));
+      bl.addEventListener('mouseleave',hideTip);
+      track.appendChild(bl);
+    });
+    drv.pits.forEach(pl=>{
+      const pm=document.createElement('div');pm.className='pit-vline';
+      pm.style.left=(pl-1)/LAPS*100+'%';
+      pm.addEventListener('mouseenter',e=>showTip(e,`<strong>${drv.name}</strong><br>Pit Stop — Lap ${pl}`));
+      pm.addEventListener('mouseleave',hideTip);
+      track.appendChild(pm);
+    });
+    const lv=document.createElement('div');lv.className='lap-vline';
+    lv.style.left=(lap-1)/LAPS*100+'%';track.appendChild(lv);
+    row.appendChild(track);rows.appendChild(row);
+  });
+}
+function renderTyreStats(){
+  const id=document.getElementById('tyreDrv').value;
+  const drv=DRIVERS.find(d=>d.id===id);
+  const tyreLap=parseInt(document.getElementById('tyreLapSlider').value);
+  const curStint=drv.stints.find(s=>tyreLap>=s.s&&tyreLap<=s.e);
+  const lapsOnTyre=curStint?tyreLap-curStint.s+1:0;
+  const cname={S:'Soft',M:'Medium',H:'Hard'}[curStint?.c||'M'];
+  const pits=drv.pits.length;
+  const el=document.getElementById('tyreStats');
+  el.innerHTML=`
+    <div class="tyre-stats">
+      <div class="ts-row"><span class="ts-label">Current Compound</span><span style="font-weight:700;">${cname}</span></div>
+      <div class="ts-row"><span class="ts-label">Laps on Tyre</span><span style="font-weight:700;color:${lapsOnTyre>25?'var(--red)':lapsOnTyre>15?'var(--gold)':'var(--green)'};">${lapsOnTyre} laps</span></div>
+      <div class="ts-row"><span class="ts-label">Tyre Age Status</span><span class="tag ${lapsOnTyre>25?'tag-red':lapsOnTyre>15?'tag-gold':'tag-green'}">${lapsOnTyre>25?'WORN':lapsOnTyre>15?'USED':'FRESH'}</span></div>
+      <div class="ts-row"><span class="ts-label">Total Pit Stops</span><span style="font-weight:700;">${pits}</span></div>
+      <div class="ts-row"><span class="ts-label">Stint Count</span><span style="font-weight:700;">${drv.stints.length}</span></div>
+      <div class="ts-row"><span class="ts-label">Strategy Type</span><span style="font-weight:700;">${drv.stints.length===1?'ONE-STOP':'TWO-STOP'}</span></div>
+    </div>`;
+}
+let tyreLap=1;
+document.getElementById('tyreLapSlider').addEventListener('input',e=>{
+  tyreLap=+e.target.value;
+  document.getElementById('tyreLapNum').innerHTML=`${tyreLap} <span style="font-size:13px;color:var(--muted);font-weight:400;">/ 78</span>`;
+  renderTyreStrategy(tyreLap);renderTyreStats();
+  document.getElementById('liveLap').textContent='LAP '+tyreLap;
+});
+
+// ══════════════════════════════════════
+//  4. POSITION TRACE
+// ══════════════════════════════════════
+let posLap=78,playInterval=null;
+function renderPosChart(lap){
+  const cv=document.getElementById('posCanvas');
+  const pr=cv.parentElement;
+  cv.width=pr.offsetWidth;cv.height=Math.max(380,pr.offsetHeight-60);
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+  const P={t:14,r:90,b:24,l:28};
+  const W=cv.width-P.l-P.r,H=cv.height-P.t-P.b;
+  // Grid
+  for(let p=1;p<=5;p++){
+    const y=P.t+(p-1)/4*H;
+    ctx.strokeStyle='rgba(255,200,215,.07)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+W,y);ctx.stroke();
+    ctx.fillStyle='rgba(255,190,210,.35)';ctx.font='bold 10px Segoe UI';ctx.setLineDash([]);
+    ctx.fillText('P'+p,6,y+4);
+  }
+  [10,20,30,40,50,60,70].forEach(l=>{
+    const x=P.l+(l-1)/(LAPS-1)*W;
+    ctx.strokeStyle='rgba(255,200,215,.06)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
+    ctx.beginPath();ctx.moveTo(x,P.t);ctx.lineTo(x,P.t+H);ctx.stroke();
+    ctx.fillStyle='rgba(255,190,210,.25)';ctx.font='8px Segoe UI';ctx.setLineDash([]);
+    ctx.fillText(l,x-4,P.t+H+14);
+  });
+  // Lines
+  DRIVERS.forEach(drv=>{
+    ctx.beginPath();ctx.strokeStyle=drv.color;ctx.lineWidth=2;ctx.setLineDash([]);
+    let mv=false;
+    for(let l=1;l<=Math.min(lap,LAPS);l++){
+      const p=drv.pos[l];if(!p)continue;
+      const x=P.l+(l-1)/(LAPS-1)*W,y=P.t+(p-1)/4*H;
+      if(!mv){ctx.moveTo(x,y);mv=true;}else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // Pit markers
+    drv.pits.forEach(pl=>{
+      if(pl>lap)return;
+      const p=drv.pos[pl],x=P.l+(pl-1)/(LAPS-1)*W,y=P.t+(p-1)/4*H;
+      ctx.fillStyle=drv.color;
+      ctx.beginPath();ctx.moveTo(x,y-8);ctx.lineTo(x-4,y-14);ctx.lineTo(x+4,y-14);ctx.closePath();ctx.fill();
+    });
+    // Live dot + label
+    const cp=drv.pos[Math.min(lap,LAPS)];
+    if(cp){
+      const x=P.l+(Math.min(lap,LAPS)-1)/(LAPS-1)*W,y=P.t+(cp-1)/4*H;
+      ctx.fillStyle=drv.color;ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=drv.color;ctx.font='bold 10px Segoe UI';
+      ctx.fillText(`${drv.abbr} P${cp}`,x+8,y+4);
+    }
+  });
+  // Current lap line
+  const lx=P.l+(Math.min(lap,LAPS)-1)/(LAPS-1)*W;
+  ctx.strokeStyle='rgba(232,0,45,.55)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(lx,P.t);ctx.lineTo(lx,P.t+H);ctx.stroke();ctx.setLineDash([]);
+
+  document.getElementById('posLapNum').textContent=lap;
+  document.getElementById('liveLap').textContent='LAP '+lap;
+
+  // Legend
+  const lg=document.getElementById('posLegend');lg.innerHTML='';
+  DRIVERS.forEach(d=>{
+    const sp=document.createElement('span');
+    sp.style.cssText=`font-size:10px;font-weight:700;color:${d.color};`;
+    sp.textContent='● '+d.abbr;lg.appendChild(sp);
+  });
+}
+function renderPosStatCards(){
+  const el=document.getElementById('posStatCards');el.innerHTML='';
+  [...DRIVERS].sort((a,b)=>a.pos[LAPS]-b.pos[LAPS]).forEach(drv=>{
+    const startPos=drv.pos[1]||1,finPos=drv.pos[LAPS];
+    const gained=startPos-finPos;
+    const card=document.createElement('div');card.className='pos-stat-card';
+    card.innerHTML=`
+      <div class="ps-drv"><div class="ps-dot" style="background:${drv.color};box-shadow:0 0 5px ${drv.color}60"></div>${drv.name}<span class="tag tag-red" style="margin-left:auto;">P${finPos}</span></div>
+      <div class="ps-grid">
+        <div class="ps-item"><strong>P${startPos}</strong>Start</div>
+        <div class="ps-item"><strong>P${finPos}</strong>Finish</div>
+        <div class="ps-item"><strong style="color:${gained>0?'var(--green)':gained<0?'var(--red)':'var(--gold)'}">${gained>0?'▲'+gained:gained<0?'▼'+Math.abs(gained):'='}</strong>Positions</div>
+        <div class="ps-item"><strong>${drv.pits.length||0}</strong>Pit Stops</div>
+      </div>`;
+    el.appendChild(card);
+  });
+}
+document.getElementById('posLapSlider').addEventListener('input',e=>{
+  posLap=+e.target.value;renderPosChart(posLap);
+});
+function togglePlay(){
+  if(playInterval){clearInterval(playInterval);playInterval=null;document.getElementById('posPlayBtn').textContent='▶';return;}
+  if(posLap>=LAPS)posLap=1;
+  document.getElementById('posPlayBtn').textContent='⏸';
+  playInterval=setInterval(()=>{
+    posLap=Math.min(posLap+1,LAPS);
+    document.getElementById('posLapSlider').value=posLap;
+    renderPosChart(posLap);
+    if(posLap>=LAPS){clearInterval(playInterval);playInterval=null;document.getElementById('posPlayBtn').textContent='▶';}
+  },120);
+}
+
+// ══════════════════════════════════════
+//  5. WHAT-IF SIMULATOR
+// ══════════════════════════════════════
+function runWhatIf(){
+  const drvId=document.getElementById('wiDrv').value;
+  const wiLap=parseInt(document.getElementById('wiLapSlider').value);
+  const compound=document.getElementById('wiCompound').value;
+  const drv=DRIVERS.find(d=>d.id===drvId);
+  if(!drv)return;
+  const actualPit=drv.pits[0]||30;
+  const delta=wiLap-actualPit;
+  const finPos=drv.pos[LAPS];
+  // Compute impact
+  const DEG={SOFT:.12,MEDIUM:.07,HARD:.04};
+  const PACE={SOFT:-.6,MEDIUM:0,HARD:.3};
+  let timeDelta=0;
+  if(delta<0){// Earlier
+    timeDelta=delta*.5*(DEG.MEDIUM+.02);// less deg but lost track pos
+    timeDelta+=Math.abs(delta)*PACE[compound];
+  } else {
+    timeDelta=delta*DEG.MEDIUM*(LAPS-wiLap)*.08;
+  }
+  timeDelta=Math.max(-25,Math.min(25,timeDelta));
+  const posDelta=Math.round(timeDelta/2.5);
+  const simPos=Math.max(1,Math.min(20,finPos+posDelta));
+  const verdict=timeDelta<-1.5?'better':timeDelta>1.5?'worse':'neutral';
+
+  // Result card
+  const rc=document.getElementById('wiResultCard');rc.style.display='block';
+  const posChange=posDelta<0?`<span class="gain">▲${Math.abs(posDelta)} positions gained</span>`
+    :posDelta>0?`<span class="loss">▼${posDelta} positions lost</span>`
+    :`<span class="neutral">= No change</span>`;
+  rc.innerHTML=`
+    <h4>⚡ Simulation Result — ${drv.name}</h4>
+    <div class="wi-metric"><span class="wi-metric-label">Actual pit lap</span><span class="wi-metric-val">Lap ${actualPit}</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">Simulated pit lap</span><span class="wi-metric-val">${delta===0?'Same':delta<0?'Lap '+wiLap+' (Earlier)':'Lap '+wiLap+' (Later)'}</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">New compound</span><span class="wi-metric-val">${compound}</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">Time delta</span><span class="wi-metric-val ${timeDelta<0?'gain':'loss'}">${timeDelta>=0?'+':''}${timeDelta.toFixed(2)}s</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">Actual finish</span><span class="wi-metric-val">P${finPos}</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">Simulated finish</span><span class="wi-metric-val ${posDelta<0?'gain':posDelta>0?'loss':'neutral'}">P${simPos}</span></div>
+    <div class="wi-metric"><span class="wi-metric-label">Position change</span><span>${posChange}</span></div>`;
+
+  const vb=document.getElementById('wiVerdict');vb.style.display='flex';
+  vb.className='verdict-banner '+verdict;
+  const msgs={
+    better:`✅ BETTER STRATEGY — Pitting Lap ${wiLap} would save ~${Math.abs(timeDelta).toFixed(1)}s and gain ${Math.abs(posDelta)} position(s).`,
+    worse:`❌ WORSE STRATEGY — Pitting Lap ${wiLap} costs ~${timeDelta.toFixed(1)}s and loses ${posDelta} position(s).`,
+    neutral:`➖ NEUTRAL — Pitting Lap ${wiLap} has minimal effect on the final result.`,
+  };
+  vb.textContent=msgs[verdict];
+
+  // Draw sweep
+  drawSweep(drvId,compound);
+
+  // Compare table
+  const tbl=document.getElementById('wiCompareTable');
+  const compareLaps=[actualPit-10,actualPit-5,actualPit,actualPit+5,actualPit+10].filter(l=>l>3&&l<73);
+  tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;">
+    <tr style="border-bottom:1px solid var(--red-border);">
+      <th style="text-align:left;padding:7px;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;">Pit Lap</th>
+      <th style="padding:7px;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;">Time Δ</th>
+      <th style="padding:7px;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;">Finish</th>
+      <th style="padding:7px;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;">Verdict</th>
+    </tr>
+    ${compareLaps.map(l=>{
+      const d2=l-actualPit;
+      let td=d2<0?d2*.5*DEG.MEDIUM:d2*DEG.MEDIUM*(LAPS-l)*.08;
+      td=Math.max(-25,Math.min(25,td));
+      const pd=Math.round(td/2.5);
+      const sp=Math.max(1,Math.min(20,finPos+pd));
+      const isActual=l===actualPit;
+      const v=td<-1?'gain':td>1?'loss':'neutral';
+      return `<tr style="border-bottom:1px solid var(--faint);${isActual?'background:rgba(232,0,45,.07);':''}">
+        <td style="padding:8px;font-weight:${isActual?700:400};">${l}${isActual?' ← ACTUAL':''}</td>
+        <td style="padding:8px;text-align:center;" class="${v}">${td>=0?'+':''}${td.toFixed(2)}s</td>
+        <td style="padding:8px;text-align:center;font-weight:700;">P${sp}</td>
+        <td style="padding:8px;text-align:center;"><span class="tag ${td<-1?'tag-green':td>1?'tag-red':'tag-gold'}">${td<-1?'BETTER':td>1?'WORSE':'SAME'}</span></td>
+      </tr>`;
+    }).join('')}
+  </table>`;
+}
+
+function drawSweep(drvId,compound){
+  const cv=document.getElementById('sweepCanvas');
+  cv.width=cv.parentElement.offsetWidth-24;cv.height=220;
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+  const drv=DRIVERS.find(d=>d.id===drvId);
+  if(!drv)return;
+  const actualPit=drv.pits[0]||30;
+  const P={t:12,r:14,b:28,l:38};
+  const W=cv.width-P.l-P.r,H=cv.height-P.t-P.b;
+  const DEG={SOFT:.12,MEDIUM:.07,HARD:.04};
+  const laps=Array.from({length:60},(_,i)=>i+5);
+  const deltas=laps.map(l=>{
+    const d=l-actualPit;
+    let td=d<0?d*.5*DEG.MEDIUM:d*DEG.MEDIUM*(LAPS-l)*.08;
+    return Math.max(-20,Math.min(20,td));
+  });
+  const maxAbs=Math.max(...deltas.map(Math.abs),5);
+  // Grid
+  ctx.strokeStyle='rgba(255,200,215,.06)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+  [-10,-5,0,5,10].forEach(v=>{
+    const y=P.t+H/2-v/maxAbs*(H/2);
+    ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+W,y);ctx.stroke();
+    ctx.fillStyle='rgba(255,190,210,.25)';ctx.font='8px Segoe UI';ctx.setLineDash([]);
+    ctx.fillText((v>0?'+':'')+v+'s',4,y+3);
+  });
+  ctx.setLineDash([]);
+  // Zero line
+  ctx.strokeStyle='rgba(255,200,215,.2)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(P.l,P.t+H/2);ctx.lineTo(P.l+W,P.t+H/2);ctx.stroke();
+  // Bars
+  const bw=W/laps.length*.85;
+  laps.forEach((l,i)=>{
+    const td=deltas[i];
+    const isActual=l===actualPit;
+    const isWi=l===parseInt(document.getElementById('wiLapSlider').value);
+    const color=isActual?'rgba(255,215,0,.8)':isWi?'rgba(255,255,255,.9)':td<-1?'rgba(34,221,136,.7)':td>1?'rgba(232,0,45,.7)':'rgba(150,150,150,.5)';
+    const barH=Math.abs(td)/maxAbs*(H/2);
+    const x=P.l+i/laps.length*W;
+    const y=td<0?P.t+H/2-barH:P.t+H/2;
+    ctx.fillStyle=color;ctx.fillRect(x,y,bw,barH);
+    if(isActual||isWi){
+      ctx.fillStyle='rgba(255,255,255,.8)';ctx.font='8px Segoe UI';
+      ctx.fillText(isActual?'ACT':'SIM',x-2,td<0?y-4:y+barH+10);
+    }
+  });
+  ctx.fillStyle='rgba(255,190,210,.25)';ctx.font='9px Segoe UI';
+  ctx.fillText('Pit Lap',P.l+W/2-15,P.t+H+22);
+}
+
+// ══════════════════════════════════════
+//  6. RACE DEBRIEF
+// ══════════════════════════════════════
+function renderDebrief(){
+  const container=document.getElementById('debriefCards');container.innerHTML='';
+  const sorted=[...DRIVERS].sort((a,b)=>a.pos[LAPS]-b.pos[LAPS]);
+  sorted.forEach(drv=>{
+    const finPos=drv.pos[LAPS],startPos=drv.pos[1]||1;
+    const gained=startPos-finPos;
+    const avgLap=SECTOR_DATA[drv.id].avg,bestLap=SECTOR_DATA[drv.id].best;
+    const cname={S:'Soft',M:'Medium',H:'Hard'};
+    const stintDesc=drv.stints.map(s=>`${cname[s.c]} (L${s.s}–${s.e})`).join(' → ');
+    const verdictText=finPos<=2?'Optimal strategy — maximized race pace with perfect pit timing.'
+      :finPos===3?'Solid strategy — tyre management preserved position effectively.'
+      :gained>0?`Gained ${gained} positions — strong race pace recovered positions.`
+      :gained<0?`Lost ${Math.abs(gained)} positions — pit strategy cost track position.`
+      :'Consistent pace — strategy matched pre-race plan.';
+    const verdictClass=finPos<=2?'good':finPos<=4?'ok':'bad';
+    const card=document.createElement('div');card.className='debrief-card';
+    card.innerHTML=`
+      <div class="dc-header">
+        <div class="dc-pos">P${finPos}</div>
+        <div style="flex:1;"><div class="dc-name">${drv.name}</div><div class="dc-team" style="color:${drv.color};">${drv.team}</div></div>
+        <span class="tag ${gained>0?'tag-green':gained<0?'tag-red':'tag-gold'}">${gained>0?'▲+'+gained:gained<0?'▼'+gained:'= 0'}</span>
+      </div>
+      <div class="dc-metrics">
+        <div class="dc-metric"><div class="val">P${startPos}</div><div class="lbl">Start</div></div>
+        <div class="dc-metric"><div class="val">${bestLap.toFixed(2)}s</div><div class="lbl">Best Lap</div></div>
+        <div class="dc-metric"><div class="val">${drv.pits.length||'–'}</div><div class="lbl">Pit Stops</div></div>
+      </div>
+      <div class="dc-strat">Strategy: ${stintDesc}</div>
+      <div class="dc-verdict ${verdictClass}">${finPos<=2?'✅':finPos<=4?'⚠️':'❌'} ${verdictText}</div>`;
+    container.appendChild(card);
+  });
+
+  // Race timeline
+  const sumBox=document.getElementById('debriefSummaryBox');
+  sumBox.innerHTML=`
+    <div class="box-hdr"><div class="box-title">RACE <em>TIMELINE</em> — Key Strategy Events</div></div>
+    <div class="box-body">
+      <div class="debrief-summary sum-title">Chronological Race Events</div>
+      <div class="sum-timeline" id="timelineEvents"></div>
+    </div>`;
+  const events=[
+    {lap:1,text:'Race start — Leclerc leads from pole on Soft tyres. Sainz P2, Verstappen P3.'},
+    {lap:8,text:'Alonso climbs to P3, passes Verstappen around the outside at Casino.'},
+    {lap:18,text:'Leclerc leads but tyre deg visible — sector 2 delta increasing vs Sainz.'},
+    {lap:24,text:'Leclerc pits from the lead — switches to Medium. Drops to P4 behind Alonso.'},
+    {lap:27,text:'Sainz pits — Soft to Medium. Rejoins P6, undercut incomplete.'},
+    {lap:29,text:'Verstappen pits — Medium to Hard. Strategic overcut attempt begins.'},
+    {lap:32,text:'Hamilton pits — last of the frontrunners. Rejoins P5, Hard compound.'},
+    {lap:34,text:'Verstappen passes Leclerc for P1 on superior Hard tyre pace.'},
+    {lap:55,text:'Alonso on used Medium holds P2 — track position at Monaco proving decisive.'},
+    {lap:78,text:'CHEQUERED FLAG — Verstappen P1, Alonso P2, Leclerc P3. Verstappen wins.'},
+  ];
+  const tl=document.getElementById('timelineEvents');
+  events.forEach(ev=>{
+    const div=document.createElement('div');div.className='sum-event';
+    div.innerHTML=`<div class="ev-lap">LAP ${ev.lap}</div><div class="ev-text">${ev.text}</div>`;
+    tl.appendChild(div);
+  });
+}
+
+function exportDebrief(){
+  const content=document.getElementById('feat-debrief').innerText;
+  const blob=new Blob([`F1 Strategy Analyzer — Race Debrief\nMonaco Grand Prix 2023\n${'='.repeat(50)}\n\n${content}`],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='monaco_2023_debrief.txt';a.click();
+}
+
+// ══════════════════════════════════════
+//  TOOLTIP
+// ══════════════════════════════════════
+function showTip(e,html){const t=document.getElementById('tip');t.innerHTML=html;t.classList.add('show');t.style.left=(e.clientX+16)+'px';t.style.top=(e.clientY-12)+'px';}
+function hideTip(){document.getElementById('tip').classList.remove('show');}
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+window.addEventListener('load',()=>{
+  drawCircuit();updateLegend('sector');drawCars(1);
+  renderTyreStrategy(1);renderTyreStats();
+  renderPosChart(78);renderPosStatCards();
+  runWhatIf();
+  // Auto sweep on circuit load
+  let al=1;
+  const ap=setInterval(()=>{
+    al++;if(al>20)return clearInterval(ap);
+    document.getElementById('circLapSlider').value=al;
+    document.getElementById('circLapNum').innerHTML=`${al} <span style="font-size:14px;font-weight:400;color:var(--muted);">/ 78</span>`;
+    document.getElementById('liveLap').textContent='LAP '+al;
+    drawCars(al);circLap=al;
+  },65);
+});
+window.addEventListener('resize',()=>{
+  renderPosChart(posLap);
+  if(document.getElementById('feat-whatif').classList.contains('active'))runWhatIf();
+  if(document.getElementById('feat-sector').classList.contains('active'))renderSectorAnalysis();
+});
+</script>
+</body>
+</html>
